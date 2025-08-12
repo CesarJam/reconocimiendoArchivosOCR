@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OCR PDF con JS (Región Superior)</title>
+    <!-- pdf.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.13.216/pdf.min.js"></script>
+    <!-- tesseract.js -->
+    <script src="https://unpkg.com/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
+</head>
+
+<body>
+    <h1>OCR Solo Región Superior (10 cm): CJ/DA, Dependencia, Asunto y Fecha</h1>
+    <input type="file" id="fileInput" accept="application/pdf" />
+    <button id="processBtn" disabled>Procesar PDF</button>
+
+    <button id="renameBtn">Seleccionar y renombrar PDF</button>
+    <div id="log"></div>
+
+
+
+    <!-- Imagen de carga -->
+    <div id="loading" style="display:none; margin:10px 0;">
+        <img src="espera.gif" alt="Cargando..." />
+    </div>
+    <div id="output"></div>
+    <canvas id="pdfCanvas" style="display:none;"></canvas>
+    <!--<script src="functions/ocr.js"></script>-->
+    <script>
+        const log = msg => {
+      document.getElementById('log').innerText += msg + '\n';
+    };
+
+    document.getElementById('renameBtn').addEventListener('click', async () => {
+      try {
+        // 1) Abrir selector de archivo (.pdf)
+        const [fileHandle] = await window.showOpenFilePicker({
+          types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }],
+          multiple: false
+        });
+        log('✅ Archivo seleccionado: ' + fileHandle.name);
+
+        // 2) Obtener el File y sus datos (ArrayBuffer)
+        const file = await fileHandle.getFile();
+        const arrayBuffer = await file.arrayBuffer();
+        // — aquí podrías procesar OCR sobre arrayBuffer —
+        // Por ejemplo, extraer fecha, número y asunto:
+        const fechaISO = '2025-06-18';
+        const numero   = '0038';
+        const asunto   = 'Justificante por comisión';
+
+        // Formar el nuevo nombre (sanitizar caracteres inválidos)
+        const newName = `${fechaISO} - ${numero} - ${asunto}.pdf`
+                          .replace(/[/\\?%*:|"<>]/g, '_');
+        log('🔄 Renombrando a: ' + newName);
+
+        // 3) Obtener permiso de escritura en la carpeta del archivo
+        //    Chrome 115+ soporta getParent(); si no, usar showDirectoryPicker()
+
+        
+        let parentDir;
+        if (fileHandle.getParent) {
+          parentDir = await fileHandle.getParent();
+        } else {
+          log('ℹ️ showDirectoryPicker() en uso (elige la carpeta del PDF)');
+          parentDir = await window.showDirectoryPicker();
+        }
+        const perm = await parentDir.requestPermission({ mode: 'readwrite' });
+        if (perm !== 'granted') {
+          throw new Error('Permiso de escritura denegado');
+        }
+        
+        log('✅ Permiso concedido para escritura');
+
+       
+
+        // 4) Crear el nuevo archivo y escribir su contenido
+        const newHandle = await parentDir.getFileHandle(newName, { create: true });
+        const writable  = await newHandle.createWritable();
+        await writable.write(arrayBuffer);
+        await writable.close();
+        log('✅ Nuevo archivo creado: ' + newName);
+
+        // 5) Eliminar el archivo antiguo
+        //await parentDir.removeEntry(fileHandle.name);
+        log('✅ Archivo original eliminado: ' + fileHandle.name);
+
+        log('✔️ Proceso completado');
+      } catch (err) {
+        console.error(err);
+        log('❌ Error: ' + err.message);
+      }
+    });
+    
+    
+    </script>
+</body>
+
+</html>

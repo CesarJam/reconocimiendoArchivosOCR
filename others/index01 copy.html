@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bulk PDF Renamer con Previews en Renombrados</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.13.216/pdf.min.js"></script>
+    <!-- tesseract.js -->
+    <script src="https://unpkg.com/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
+</head>
+
+<body class="bg-light">
+    <div class="container py-5">
+        <h1 class="mb-4 text-primary">Renombrador Masivo de PDFs</h1>
+
+        <!-- Paso 1: Selección -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-white">
+                <h2 class="h5 mb-0">1. Selecciona tus archivos PDF</h2>
+            </div>
+            <div class="card-body">
+                <input id="filesInput" type="file" class="form-control" accept="application/pdf" multiple>
+                <ul id="originalList" class="list-group list-group-flush mt-3"></ul>
+
+                <button id="renameBtn" class="btn btn-primary mt-3" disabled>Renombrar todos los archivos</button>
+            </div>
+        </div>
+        <div id="output" class="mt-3"></div>
+        <!-- Paso 2: Renombrados con Preview -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-white">
+                <h2 class="h5 mb-0">2. Vista previa &amp; Editar nombres</h2>
+            </div>
+            <div class="card-body">
+                <ul id="renamedList" class="list-group list-group-flush"></ul>
+                <button id="confirmBtn" class="btn btn-success mt-3" disabled>Confirmar y guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Configuración PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.13.216/pdf.worker.min.js';
+
+        const filesInput = document.getElementById('filesInput'),
+            originalList = document.getElementById('originalList'),
+            renameBtn = document.getElementById('renameBtn'),
+            renamedList = document.getElementById('renamedList'),
+            confirmBtn = document.getElementById('confirmBtn');
+
+        let files = [], renamedFiles = [];
+
+        // Paso 1: Selección de archivos
+        filesInput.addEventListener('change', () => {
+            files = Array.from(filesInput.files);
+            originalList.innerHTML = '';
+            renamedList.innerHTML = '';
+            confirmBtn.disabled = true;
+
+            files.forEach(f => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item';
+                li.textContent = f.name;
+                originalList.appendChild(li);
+            });
+
+            renameBtn.disabled = files.length === 0;
+        });
+
+        //Paso2: Convertir con OCR y extraer información
+        
+
+
+        
+        renameBtn.addEventListener('click', async () => {
+            if (files.length === 0) return;
+            renameBtn.disabled = true;
+            confirmBtn.disabled = true;
+            renamedList.innerHTML = '';
+            output.textContent = 'Procesando OCR en todos los archivos…';
+
+            // canvas “off-screen” para render + recorte
+            const renderCanvas = document.createElement('canvas');
+            const renderCtx = renderCanvas.getContext('2d');
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                try {
+                    // 1) Carga PDF y página 1
+                    const url = URL.createObjectURL(file);
+                    const pdf = await pdfjsLib.getDocument(url).promise;
+                    const page = await pdf.getPage(1);
+
+                    // 2) Render completo
+                    const scale = 2;
+                    const vp = page.getViewport({ scale });
+                    renderCanvas.width = vp.width;
+                    renderCanvas.height = vp.height;
+                    await page.render({ canvasContext: renderCtx, viewport: vp }).promise;
+
+                    // 3) Recortar los primeros 10 cm
+                    const pagePts = page.view[3] - page.view[1];
+                    const regionPx = Math.floor(((10 * 72 / 2.54) / pagePts) * vp.height);
+                    const tmpCanvas = document.createElement('canvas');
+                    tmpCanvas.width = vp.width;
+                    tmpCanvas.height = regionPx;
+                    tmpCanvas.getContext('2d')
+                        .putImageData(renderCtx.getImageData(0, 0, vp.width, regionPx), 0, 0);
+
+                    // 4) OCR sólo en esa región
+                    const { data: { text } } = await Tesseract.recognize(
+                        tmpCanvas, 'spa',
+                        { tessedit_pageseg_mode: Tesseract.PSM.SINGLE_BLOCK }
+                    );
+                    const excerpt = text.slice(0, 1000);
+
+                    // 5) Extraer campos
+                    const numero = extractCjDaNumber(excerpt) || 'NoOficio';
+                    const asunto = extractSubject(excerpt);
+                    const fechaTxt = extractDate(excerpt);
+                    const fechaISO = fechaTxt !== 'No encontrada'
+                        ? (formatDateToISO(fechaTxt) || 'FechaInválida')
+                        : 'FechaNoEncontrada';
+
+                    // 6) Nuevo nombre “seguro”
+                    const safe = str => str.replace(/[/\\?%*:|"<>]/g, '_');
+                    const newName = safe(`${fechaISO} ${numero} - ${asunto}.pdf`);
+
+                    renamedFiles.push({ file, oldName: file.name, newName });
+                    URL.revokeObjectURL(url);
+
+                    // 7) Agregar a lista 2
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item';
+                    li.innerHTML = `
+                            <div class="d-flex align-items-center">
+                                <div class="fw-bold me-3">${file.name}</div>
+                                <input
+                                type="text"
+                                class="form-control form-control-sm flex-grow-1 me-3 edit-name"
+                                data-idx="${renamedFiles.length - 1}"
+                                value="${newName}"
+                                >
+                                <button
+                                class="btn btn-sm btn-outline-secondary preview-btn"
+                                data-idx="${renamedFiles.length - 1}"
+                                >Vista previa</button>
+                            </div>
+                            `;
+                    renamedList.appendChild(li);
+
+                    // A partir de aquí tu lógica de listeners sobre .edit-name y .preview-btn queda igual,
+                    // pero apunta al <canvas> que ahora se selecciona con:
+                    //   const cv = li.querySelector('.preview-canvas');
+
+
+                    // input editable
+                    li.querySelector('.edit-name').addEventListener('input', e => {
+                        renamedFiles[e.target.dataset.idx].newName = e.target.value;
+                    });
+
+                    // preview en lista 2
+                    const btn = li.querySelector('.preview-btn');
+                    const cv = document.createElement('canvas');
+                    cv.className = 'preview-canvas mt-2 border w-100';
+                    cv.style.display = 'none';
+                    li.appendChild(cv);
+
+                    const cctx = cv.getContext('2d');
+
+                    btn.addEventListener('click', async () => {
+                        if (cv.style.display === 'none') {
+                            btn.disabled = true;
+                            const u = URL.createObjectURL(file);
+                            const p = await pdfjsLib.getDocument(u).promise;
+                            const pg = await p.getPage(1);
+                            // escala alta para resolución
+                            const vp2 = pg.getViewport({ scale: 1.5 });
+                            const dpr = window.devicePixelRatio || 1;
+                            // tamaño físico
+                            cv.width = vp2.width * dpr;
+                            cv.height = vp2.height * dpr;
+                            // ancho CSS al 100%, altura auto según ratio
+                            cv.style.width = '100%';
+                            cv.style.height = 'auto';
+                            // ajusta el contexto a la densidad de píxeles
+                            cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                            await pg.render({ canvasContext: cctx, viewport: vp2 }).promise;
+                            URL.revokeObjectURL(u);
+
+                            cv.style.display = 'block';
+                            btn.textContent = 'Ocultar preview';
+                            btn.disabled = false;
+                        } else {
+                            cv.style.display = 'none';
+                            btn.textContent = 'Vista previa';
+                        }
+                    });
+
+                } catch (err) {
+                    console.error('OCR error en', file.name, err);
+                }
+            }
+
+            output.textContent = '';
+            confirmBtn.disabled = renamedFiles.length === 0;
+            renameBtn.disabled = false;
+        });
+        
+
+
+        // Confirmar y guardar (simulado)
+        confirmBtn.addEventListener('click', async () => {
+            if (renamedFiles.length === 0) return;
+            confirmBtn.disabled = true;
+            output.textContent = 'Guardando archivos renombrados…';
+
+            try {
+                // 1) Pedir al usuario la carpeta destino
+                const dirHandle = await window.showDirectoryPicker();
+                // 2) Solicitar permiso de escritura
+                const perm = await dirHandle.requestPermission({ mode: 'readwrite' });
+                if (perm !== 'granted') throw new Error('Permiso de escritura denegado.');
+
+                // 3) Por cada archivo de la lista, creamos el nuevo y escribimos el contenido
+                for (let { file, newName } of renamedFiles) {
+                    const arrayBuffer = await file.arrayBuffer();
+                    // createWritable sobrescribe si ya existe
+                    const fh = await dirHandle.getFileHandle(newName, { create: true });
+                    const w = await fh.createWritable();
+                    await w.write(arrayBuffer);
+                    await w.close();
+                }
+
+                output.textContent = `✅ ${renamedFiles.length} archivos guardados en la carpeta seleccionada.`;
+            } catch (err) {
+                console.error(err);
+                output.textContent = '❌ Error al guardar: ' + err.message;
+            } finally {
+                confirmBtn.disabled = false;
+            }
+        });
+
+    </script>
+    <script src="functions/ocr.js"></script>
+</body>
+
+</html>

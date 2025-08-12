@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bulk PDF Renamer con Previews en Renombrados</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.13.216/pdf.min.js"></script>
+    <!-- tesseract.js -->
+    <script src="https://unpkg.com/tesseract.js@2.1.5/dist/tesseract.min.js"></script>
+    <style>
+        .preview-canvas {
+            display: none;
+            /* oculto al inicio */
+            /*width: 100%; /* siempre ocupe TODO el ancho de su contenedor */
+            height: auto;
+            /* mantener proporción */
+            box-sizing: border-box;
+            /* que el border no expanda el elemento */
+            border: 3px solid limegreen;
+            /* tu borde */
+        }
+
+        #loading img {
+            display: inline-block;
+            /* Asegura que el img respete el border-radius */
+            border-radius: 8px;
+            ;
+            /* 50% para hacerlo completamente circular */
+            /* Si prefieres esquinas redondeadas pero no círculo, usa un valor fijo: border-radius: 8px;   */
+            overflow: hidden;
+            /* Recorta cualquier contenido que sobresalga */
+        }
+    </style>
+</head>
+
+<body class="bg-light">
+    <div class="container py-5">
+        <h1 class="mb-4 text-primary">Renombrador Masivo de PDFs</h1>
+
+        <!-- Paso 1: Selección -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-white">
+                <h2 class="h5 mb-0">1. Selecciona tus archivos PDF</h2>
+            </div>
+            <div class="card-body">
+                <input id="inputsEntradaArchivos" type="file" class="form-control" accept="application/pdf" multiple>
+                <ul id="listaArchivosOriginal" class="list-group list-group-flush mt-3"></ul>
+                <button id="btnRenombrar" class="btn btn-primary mt-3" disabled>Renombrar todos los archivos</button>
+            </div>
+
+            <!-- GIF de carga (oculto por defecto) -->
+            <div id="loading" class="text-center my-3" style="display: none;">
+                <img src="espera.gif" alt="Procesando…" class="img-fluid" />
+            </div>
+            <!-- Mensajes de estado dentro de la tarjeta -->
+            <div id="output" class="alert alert-info mt-3" role="alert"></div>
+
+        </div>
+
+        <!-- Paso 2: Renombrados con Preview -->
+        <div class="card mb-4 shadow-sm">
+            <div class="card-header bg-white">
+                <h2 class="h5 mb-0">2. Vista previa &amp; Editar nombres</h2>
+            </div>
+            <div class="card-body">
+                <ul id="listaRenombrada" class="list-group list-group-flush"></ul>
+                <button id="btnConfirmar" class="btn btn-success mt-3" disabled>Confirmar y guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap Bundle JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Configuración PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.13.216/pdf.worker.min.js';
+
+        const inputsEntradaArchivos = document.getElementById('inputsEntradaArchivos'),
+            listaArchivosOriginal = document.getElementById('listaArchivosOriginal'),
+            btnRenombrar = document.getElementById('btnRenombrar'),
+            listaRenombrada = document.getElementById('listaRenombrada'),
+            btnConfirmar = document.getElementById('btnConfirmar');
+
+        let archivos = [], archivosRenombrados = [];
+
+        // —————— EVENT DELEGATION ——————
+        /*este bloque mantiene el array de nombres actualizado en tiempo real con lo que el 
+        usuario escribe en los inputs, y lo hace de forma eficiente y centralizada.
+        */
+        listaRenombrada.addEventListener('input', e => {
+            if (!e.target.classList.contains('edit-name')) return;
+            const id = e.target.dataset.id;
+            const item = archivosRenombrados.find(x => x.id === id);
+            if (item) item.newName = e.target.value;
+        });
+
+        /*Este bloque usa event delegation sobre listaRenombrada, 
+        pero para gestionar todos los botones de “Vista previa” en un único listener
+        */
+        listaRenombrada.addEventListener('click', e => {
+            if (!e.target.classList.contains('preview-btn')) return;
+            const id = e.target.dataset.id;
+            const item = archivosRenombrados.find(x => x.id === id);
+            const li = e.target.closest('li');
+            const iframe = li.querySelector('iframe');
+            if (!item) return;
+
+            if (iframe.style.display === 'none') {
+                const blobUrl = URL.createObjectURL(item.file);
+                iframe.src = blobUrl;
+                iframe.style.display = 'block';
+                e.target.textContent = 'Ocultar preview';
+                iframe.dataset.blobUrl = blobUrl;
+            } else {
+                iframe.style.display = 'none';
+                e.target.textContent = 'Vista previa';
+                if (iframe.dataset.blobUrl) {
+                    URL.revokeObjectURL(iframe.dataset.blobUrl);
+                    delete iframe.dataset.blobUrl;
+                }
+            }
+        });
+
+        // Paso 1: Selección de archivos
+        inputsEntradaArchivos.addEventListener('change', () => {
+            archivos = Array.from(inputsEntradaArchivos.files);
+            listaArchivosOriginal.innerHTML = '';
+            listaRenombrada.innerHTML = '';
+            btnConfirmar.disabled = true;
+
+            archivos.forEach(f => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item';
+                li.textContent = f.name;
+                listaArchivosOriginal.appendChild(li);
+            });
+            btnRenombrar.disabled = archivos.length === 0;
+        });
+
+        //Paso2: Convertir con OCR y extraer información
+
+        const fullRenderCanvas = document.createElement('canvas'); //crea un elemento canvas que no se añade al doc
+        const fullCtx = fullRenderCanvas.getContext('2d'); //obtiene el contexto 2d
+
+        const regionCanvas = document.createElement('canvas');//genera otro canvas off-screen
+        const regionCtx = regionCanvas.getContext('2d');
+
+        btnRenombrar.addEventListener('click', async () => {
+            // 0) Validación
+            if (!archivos || archivos.length === 0) return;
+
+            // 1) Desactiva botones y limpia listas/arrays
+            btnRenombrar.disabled = true;
+            btnConfirmar.disabled = true;
+            listaRenombrada.innerHTML = '';
+            archivosRenombrados = [];      // ← ¡Limpia el array antes de empezar!
+            output.textContent = 'Procesando OCR en todos los archivos…';
+            loading.style.display = 'block';
+
+            // 2) Bucle de OCR + generación de filas
+            for (let i = 0; i < archivos.length; i++) {
+                const file = archivos[i];
+                try {
+                    // 2.1) Extraemos datos desde el metodo de OCR ya definido
+                    const { newName } = await extractMeta(file);
+
+                    // 2.2) Guardar en el array
+                    const id = crypto.randomUUID();
+                    archivosRenombrados.push({ id, file, oldName: file.name, newName });
+
+                    // 2.3) Crear la fila en la segunda lista
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item';
+                    li.innerHTML = `
+                                <div class="d-flex align-items-center">
+                                    <div class="fw-bold me-3">${file.name}</div>
+                                    <input
+                                    type="text"
+                                    class="form-control form-control-sm flex-grow-1 me-3 edit-name"
+                                    data-id="${id}"
+                                    value="${newName}"
+                                    >
+                                    <button
+                                    class="btn btn-sm btn-outline-secondary preview-btn"
+                                    data-id="${id}"
+                                    >Vista previa</button>
+                                </div>
+                                <iframe class="pdf-preview-iframe mt-2"
+                                        style="display:none; width:100%; height:400px; border:1px solid #ccc;">
+                                </iframe>
+                                `;
+                    listaRenombrada.appendChild(li);
+
+
+
+                } catch (err) {
+                    console.error('OCR error en', file.name, err);
+                }
+            }
+
+            // 3) Restablece UI
+            loading.style.display = 'none';
+            output.textContent = '';
+            btnConfirmar.disabled = archivosRenombrados.length === 0;
+            btnRenombrar.disabled = false;
+        });
+
+        // Confirmar y guardar 
+        btnConfirmar.addEventListener('click', async () => {
+            if (!archivosRenombrados || archivosRenombrados.length === 0) return;
+            btnConfirmar.disabled = true;
+            output.textContent = 'Guardando archivos…';
+
+            try {
+                // 1) Seleccionar carpeta destino
+                const dirHandle = await window.showDirectoryPicker();
+                // 2) Pedir permiso de escritura
+                const perm = await dirHandle.requestPermission({ mode: 'readwrite' });
+                if (perm !== 'granted') throw new Error('Permiso de escritura denegado.');
+
+                // 3) Leer directamente desde los inputs editables por data-id
+                const inputs = listaRenombrada.querySelectorAll('.edit-name');
+                for (let input of inputs) {
+                    const id = input.dataset.id;
+                    // Busca el objeto correspondiente en archivosRenombrados
+                    const item = archivosRenombrados.find(x => x.id === id);
+                    if (!item) continue;
+
+                    // Toma el nombre editado (o el original si está vacío)
+                    const nuevoNombre = input.value.trim() || item.oldName;
+
+                    // 4) Escribir cada archivo con su nuevo nombre
+                    const buffer = await item.file.arrayBuffer();
+                    const fh = await dirHandle.getFileHandle(nuevoNombre, { create: true });
+                    const writer = await fh.createWritable();
+                    await writer.write(buffer);
+                    await writer.close();
+                }
+
+                output.textContent = `✅ ${inputs.length} archivos guardados correctamente.`;
+            } catch (err) {
+                console.error(err);
+                output.textContent = '❌ Error al guardar: ' + err.message;
+            } finally {
+                btnConfirmar.disabled = false;
+            }
+        });
+
+    </script>
+    <script src="functions/ocr.js"></script>
+</body>
+
+</html>
