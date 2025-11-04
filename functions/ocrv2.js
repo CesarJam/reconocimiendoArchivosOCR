@@ -37,14 +37,14 @@ async function extractMeta(file) {
 
   let nombreJustificante=""; // (Tu lógica original la he cambiado a 'let' por si acaso)
 
- if (/justificante/i.test(subj)) {  
+ if (/(justificante|guardia|incapacidad)/i.test(subj)) {  
     nombreJustificante += " - "+(extractNameJustificante(excerpt)|| ''); // (Ajuste leve: || '' dentro del paréntesis)
   }
 
   // --- INICIO DE LA MODIFICACIÓN ---
 
   // Si el asunto es un justificante, agrega el prefijo.
-  const prefix = /justificante/i.test(subj) ? "Desarrollo de Personal - " : ""; // <-- NUEVO
+  const prefix = /(justificante|guardia|incapacidad)/i.test(subj) ? "Desarrollo de Personal - " : ""; // <-- NUEVO
 
   // Se construye el nombre final con el prefijo (que estará vacío si no es justificante)
   const newName = safe(`${dateI} ${num} - ${prefix}${subj}${nombreJustificante}.pdf`); // <-- MODIFICADO
@@ -75,7 +75,7 @@ function extractSubject(text) {
 function extractNameJustificante(text) {
     // 1. El regex ahora busca "el C.", "la C.", "el Ing." o "la Ing."
     //    Añadimos la bandera 'g' (global) para encontrar TODAS las coincidencias.
-    const regex = /(?:el|la)\s+(?:C\.|Ing\.)\s*([^,]*)/ig;
+    const regex = /(?:el|la)\s+(?:C\.|Ing\.|Lic\.)\s*([^,]*)/ig;
     
     let lastMatch = null;
     let m;
