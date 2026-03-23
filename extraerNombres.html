@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Selector de Archivos (para Excel)</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .dark-mode {
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+
+        .dark-mode .card {
+            background-color: #1e1e1e;
+            border-color: #444;
+        }
+
+        .dark-mode .card-header {
+            background-color: #252525 !important;
+            border-bottom-color: #444;
+        }
+
+        .dark-mode .form-control,
+        .dark-mode .form-select {
+            background-color: #333;
+            color: #fff;
+            border-color: #555;
+        }
+
+        .dark-mode .form-control::placeholder {
+            color: #888;
+        }
+
+        .dark-mode .table {
+            color: #e0e0e0;
+        }
+
+        .dark-mode .table-striped>tbody>tr:nth-of-type(odd)>* {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: #e0e0e0;
+        }
+
+        .dark-mode .table-hover>tbody>tr:hover>* {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #e0e0e0;
+        }
+
+        .dark-mode thead th {
+            border-bottom-color: #555;
+        }
+
+        .dark-mode tbody td,
+        .dark-mode .table-striped {
+            border-color: #444;
+        }
+
+        .dark-mode .btn-outline-secondary {
+            color: #ccc;
+            border-color: #555;
+        }
+
+        .dark-mode .btn-outline-secondary:hover {
+            background-color: #444;
+        }
+
+        .dark-mode .text-muted {
+            color: #888 !important;
+        }
+
+        .dark-mode h2,
+        .dark-mode label {
+            color: #e0e0e0;
+        }
+
+        /* --- 👇 INICIO DE MEJORAS DE ESTILO --- */
+
+        /* 1. Suaviza el color azul brillante del H1 */
+        .dark-mode .text-primary {
+            color: #6ea8ff !important;
+        }
+
+        /* 2. Convierte el botón "Regresar" (warning) a un estilo "outline" menos invasivo */
+        .dark-mode .btn-warning {
+            color: #ffca2c;
+            background-color: transparent;
+            border-color: #ffca2c;
+        }
+
+        .dark-mode .btn-warning:hover {
+            color: #000;
+            background-color: #ffca2c;
+            border-color: #ffca2c;
+        }
+
+        /* 3. Hace visibles las líneas horizontales <hr> */
+        .dark-mode hr {
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        /* 4. Suaviza el resplandor de foco en formularios (era azul muy brillante) */
+        .dark-mode .form-control:focus,
+        .dark-mode .form-select:focus {
+            border-color: #6ea8ff;
+            box-shadow: 0 0 0 0.25rem rgba(110, 168, 255, 0.25);
+        }
+
+        /* 5. Da un fondo sutil al encabezado de la tabla para separarlo */
+        .dark-mode .table thead th {
+            color: #fff;
+            /* Blanco puro para el encabezado */
+            background-color: rgba(255, 255, 255, 0.07);
+        }
+
+        /* --- 👆 FIN DE MEJORAS DE ESTILO --- */
+    </style>
+
+</head>
+
+<body>
+
+    <div class="container mt-5">
+        <h1 class="mb-4 text-primary">Extractor de Metadatos de PDFs</h1>
+
+        <div class="d-flex justify-content-end mb-3">
+            <a href="index.html" class="btn btn-warning">
+                Regresar
+            </a>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body">
+
+                <h2 class="h5 mb-2">Paso 1: Cargar Archivos PDF</h2>
+                <input id="inputsEntradaArchivos" type="file" class="form-control" accept="application/pdf" multiple>
+
+                <hr class="my-4">
+
+                <h2 class="h5 mb-3">Paso 2: Configurar Datos (Opcional)</h2>
+                <div class="row">
+                    <div class="col-md-6 mb-3 mb-md-0">
+                        <label for="selectTrimestre" class="form-label">Trimestre del Expediente:</label>
+                        <div class="input-group">
+                            <select id="selectTrimestre" class="form-select">
+                                <option value="0">enero-marzo</option>
+                                <option value="1">abril-junio</option>
+                                <option value="2">julio-septiembre</option>
+                                <option value="3">octubre-diciembre</option>
+                            </select>
+                            <button class="btn btn-outline-secondary" type="button" id="btnActualizarTrimestre"
+                                disabled>
+                                Actualizar Fechas
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="inputRuta" class="form-label">Mobiliario o Ruta de Almacenamiento:</label>
+                        <div class="input-group">
+                            <input type="text" id="inputRuta" class="form-control"
+                                placeholder="Ej: http://sharepoint/ruta/...">
+                            <button class="btn btn-outline-secondary" type="button" id="btnActualizarRuta" disabled>
+                                Actualizar Rutas
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-4">
+
+                <h2 class="h5 mb-3">Paso 3: Revisar y Copiar Resultados</h2>
+                <div class="col-md-6">
+                    <button id="btnCopiar" class="btn btn-primary mt-2" disabled>
+                        Copiar Tabla a Excel
+                    </button>
+
+                </div>
+                <hr class="my-4">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th scope="col">Nombre del Archivo</th>
+                                <th scope="col" class="text-end">Total de Páginas</th>
+                                <th scope="col" class="text-end">Papel</th>
+                                <th scope="col" class="text-end">Electronico</th>
+                                <th scope="col" class="text-end">Adminsitrativo</th>
+                                <th scope="col" class="text-end">Legal</th>
+                                <th scope="col" class="text-end">Fiscal</th>
+                                <th scope="col" class="text-end">Contable</th>
+                                <th scope="col" class="text-end">Años Trámite</th>
+                                <th scope="col" class="text-end">Años Concentración</th>
+                                <th scope="col" class="text-end">Original</th>
+                                <th scope="col" class="text-end">Copia</th>
+                                <th scope="col" class="text-end">Publica</th>
+                                <th scope="col" class="text-end">Reserva</th>
+                                <th scope="col" class="text-end">Años Reserva</th>
+                                <th scope="col" class="text-end">Confidencial</th>
+                                <th scope="col" class="text-end">Apertura</th>
+                                <th scope="col" class="text-end">Cierre</th>
+                                <th scope="col" class="text-end">Inmueble</th>
+                                <th scope="col" class="text-end">Mobiliario o ruta de Almacenamiento</th>
+                            </tr>
+                        </thead>
+                        <tbody id="listaArchivosBody">
+                        </tbody>
+                    </table>
+                </div>
+
+
+
+            </div>
+        </div>
+    </div>
+    <footer class="text-center text-muted py-2">
+        Extractor de Metadatos de PDFs - Version 1.0.0
+        <div class="form-check form-switch d-inline-block ms-3">
+            <button id="toggleDarkMode" class="btn btn-sm btn-outline-secondary ms-2">🌙 Modo oscuro</button>
+        </div>
+    </footer>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.13.216/pdf.min.js"></script>
+
+    <script>
+        // Configurar el 'worker' de PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.13.216/pdf.worker.min.js';
+
+        // Referencias a elementos del DOM
+        const inputsEntradaArchivos = document.getElementById('inputsEntradaArchivos');
+        const listaArchivosBody = document.getElementById('listaArchivosBody');
+        const btnCopiar = document.getElementById('btnCopiar');
+        const selectTrimestre = document.getElementById('selectTrimestre');
+        const inputRuta = document.getElementById('inputRuta');
+        const btnActualizarRuta = document.getElementById('btnActualizarRuta');
+        const btnActualizarTrimestre = document.getElementById('btnActualizarTrimestre');
+
+        // Función para contar páginas (sin cambios)
+        async function getPdfPageCount(file) {
+            const url = URL.createObjectURL(file);
+            try {
+                const pdf = await pdfjsLib.getDocument(url).promise;
+                const pageCount = pdf.numPages;
+                URL.revokeObjectURL(url);
+                return pageCount;
+            } catch (err) {
+                console.error("Error al leer PDF:", file.name, err);
+                URL.revokeObjectURL(url);
+                return 'Error';
+            }
+        }
+
+        // Funciones de Trimestre (sin cambios)
+        function setDefaultTrimestre() {
+            const hoy = new Date();
+            const mes = hoy.getMonth();
+            const trimestreActual = Math.floor(mes / 3);
+            selectTrimestre.value = trimestreActual;
+        }
+        function getFechasPorTrimestre(trimestreValue) {
+            const anio = new Date().getFullYear();
+            switch (String(trimestreValue)) {
+                case '0': return { apertura: `${anio}-01-01`, cierre: `${anio}-03-31` };
+                case '1': return { apertura: `${anio}-04-01`, cierre: `${anio}-06-30` };
+                case '2': return { apertura: `${anio}-07-01`, cierre: `${anio}-09-30` };
+                case '3': return { apertura: `${anio}-10-01`, cierre: `${anio}-12-31` };
+                default: return { apertura: `${anio}-01-01`, cierre: `${anio}-12-31` };
+            }
+        }
+
+        // Listener del input (sin cambios)
+        inputsEntradaArchivos.addEventListener('change', async (e) => {
+
+            const archivos = Array.from(e.target.files);
+            listaArchivosBody.innerHTML = '';
+            inputsEntradaArchivos.disabled = true;
+            btnCopiar.disabled = true;
+            btnActualizarRuta.disabled = true;
+            btnActualizarTrimestre.disabled = true;
+
+            const trimestreSeleccionado = selectTrimestre.value;
+            const fechas = getFechasPorTrimestre(trimestreSeleccionado);
+            const rutaAlmacenamiento = inputRuta.value.trim() || "";
+
+            function crearCelda(texto) {
+                const td = document.createElement('td');
+                td.textContent = texto;
+                td.className = 'text-end';
+                return td;
+            }
+            function crearCeldaDerecha(texto) {
+                const td = document.createElement('td');
+                td.textContent = texto;
+                return td;
+            }
+
+            for (const f of archivos) {
+                const tr = document.createElement('tr');
+
+                const tdNombre = document.createElement('td');
+                tdNombre.textContent = f.name;
+                tr.appendChild(tdNombre);
+
+                const tdPaginas = document.createElement('td');
+                tdPaginas.className = 'text-end text-muted fst-italic';
+                tdPaginas.textContent = 'Calculando...';
+                tr.appendChild(tdPaginas);
+
+                tr.appendChild(crearCelda("X")); // Papel
+                tr.appendChild(crearCelda("X")); // Electronico
+                tr.appendChild(crearCelda("X")); // Administrativo
+                tr.appendChild(crearCelda("")); // Legal
+                tr.appendChild(crearCelda("")); // Fiscal
+                tr.appendChild(crearCelda("")); // Contable
+                tr.appendChild(crearCelda("2")); // Años Trámite
+                tr.appendChild(crearCelda("6")); // Años Concentración
+                tr.appendChild(crearCelda("X")); // Original
+                tr.appendChild(crearCelda("X")); // Copia
+                tr.appendChild(crearCelda("X")); // Publica
+                tr.appendChild(crearCelda("")); // Reserva
+                tr.appendChild(crearCelda("")); // Años Reserva
+                tr.appendChild(crearCelda("")); // Confidencial
+                tr.appendChild(crearCelda(fechas.apertura));
+                tr.appendChild(crearCelda(fechas.cierre));
+                tr.appendChild(crearCeldaDerecha("OFICINAS DE LA CONSEJERIA JURIDICA DEL PODER EJECUTIVO"));
+                tr.appendChild(crearCeldaDerecha(rutaAlmacenamiento));
+
+                listaArchivosBody.appendChild(tr);
+
+                const totalPaginas = await getPdfPageCount(f);
+                tdPaginas.textContent = totalPaginas;
+                tdPaginas.className = 'text-end';
+            }
+
+            inputsEntradaArchivos.disabled = false;
+            if (archivos.length > 0) {
+                btnCopiar.disabled = false;
+                btnActualizarRuta.disabled = false;
+                btnActualizarTrimestre.disabled = false;
+            }
+        });
+
+        // Listener para el botón de copiar (sin cambios)
+        btnCopiar.addEventListener('click', () => {
+            if (listaArchivosBody.rows.length === 0) {
+                alert("No hay datos en la tabla para copiar.");
+                return;
+            }
+            try {
+                const range = document.createRange();
+                range.selectNode(listaArchivosBody);
+                window.getSelection().removeAllRanges();
+                window.getSelection().addRange(range);
+                document.execCommand('copy');
+                window.getSelection().removeAllRanges();
+
+                const originalText = btnCopiar.textContent;
+                btnCopiar.textContent = '¡Tabla Copiada!';
+                btnCopiar.classList.add('btn-success');
+                setTimeout(() => {
+                    btnCopiar.textContent = originalText;
+                    btnCopiar.classList.remove('btn-success');
+                }, 2000);
+            } catch (err) {
+                console.error('Error al copiar la tabla: ', err);
+                alert("Hubo un error al intentar copiar la tabla.");
+            }
+        });
+
+        // Listener para "Actualizar Rutas" (sin cambios)
+        btnActualizarRuta.addEventListener('click', () => {
+            const ruta = inputRuta.value.trim();
+            if (ruta === "") {
+                alert("Por favor, escribe una ruta antes de actualizar.");
+                return;
+            }
+            const filas = listaArchivosBody.getElementsByTagName('tr');
+            if (filas.length === 0) return;
+            for (const fila of filas) {
+                const celdas = fila.getElementsByTagName('td');
+                if (celdas.length > 0) {
+                    const ultimaCelda = celdas[celdas.length - 1];
+                    ultimaCelda.textContent = ruta;
+                }
+            }
+            btnActualizarRuta.textContent = '¡Actualizado!';
+            btnActualizarRuta.classList.add('btn-success');
+            setTimeout(() => {
+                btnActualizarRuta.textContent = 'Actualizar Rutas';
+                btnActualizarRuta.classList.remove('btn-success');
+            }, 1500);
+        });
+
+        // Listener para "Actualizar Trimestre" (sin cambios)
+        btnActualizarTrimestre.addEventListener('click', () => {
+            const trimestreValor = selectTrimestre.value;
+            const fechas = getFechasPorTrimestre(trimestreValor);
+
+            const filas = listaArchivosBody.getElementsByTagName('tr');
+            if (filas.length === 0) return;
+
+            for (const fila of filas) {
+                const celdas = fila.getElementsByTagName('td');
+                if (celdas.length >= 18) {
+                    celdas[16].textContent = fechas.apertura;
+                    celdas[17].textContent = fechas.cierre;
+                }
+            }
+
+            btnActualizarTrimestre.textContent = '¡Actualizado!';
+            btnActualizarTrimestre.classList.add('btn-success');
+            setTimeout(() => {
+                btnActualizarTrimestre.textContent = 'Actualizar Fechas';
+                btnActualizarTrimestre.classList.remove('btn-success');
+            }, 1500);
+        });
+
+        // Ejecutar la función de default al cargar la página
+        document.addEventListener('DOMContentLoaded', setDefaultTrimestre);
+
+        // --- 3. JAVASCRIPT DEL MODO OSCURO (FUSIONADO) ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // 1. Lógica que ya tenías:
+            setDefaultTrimestre();
+
+            // 2. Nueva lógica del modo oscuro:
+            const toggleBtn = document.getElementById('toggleDarkMode');
+
+            // Verificar si hay un valor guardado en localStorage
+            const savedMode = localStorage.getItem('theme');
+            if (savedMode === 'dark') {
+                document.body.classList.add('dark-mode');
+                toggleBtn.textContent = '☀️ Modo claro';
+            }
+
+            // Listener para cambiar de modo
+            toggleBtn.addEventListener('click', () => {
+                document.body.classList.toggle('dark-mode');
+
+                if (document.body.classList.contains('dark-mode')) {
+                    localStorage.setItem('theme', 'dark');
+                    toggleBtn.textContent = '☀️ Modo claro';
+                } else {
+                    localStorage.setItem('theme', 'light');
+                    toggleBtn.textContent = '🌙 Modo oscuro';
+                }
+            });
+        });
+
+    </script>
+
+</body>
+
+</html>

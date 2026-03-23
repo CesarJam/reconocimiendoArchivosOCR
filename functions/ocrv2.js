@@ -47,7 +47,7 @@ async function extractMeta(file) {
   const prefix = /(justificante|guardia|incapacidad)/i.test(subj) ? "Desarrollo de Personal - " : ""; // <-- NUEVO
 
   // Se construye el nombre final con el prefijo (que estará vacío si no es justificante)
-  const newName = safe(`${dateI} ${num} - ${prefix}${subj}${nombreJustificante}.pdf`); // <-- MODIFICADO
+  const newName = safe(`${dateI} ${num} ${prefix}${subj}${nombreJustificante}.pdf`); // <-- MODIFICADO
 
   // --- FIN DE LA MODIFICACIÓN ---
 

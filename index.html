@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -16,6 +17,11 @@
             <!-- Columna izquierda: renombrador -->
             <div class="col-8 pe-0 h-100 overflow-auto">
                 <h1 class="mb-4 text-primary">Renombrador Masivo de PDFs</h1>
+                <div class="d-flex justify-content-end mb-3">
+                    <a href="extraerNombres.html" class="btn btn-warning">
+                        Extractor de nombres
+                    </a>
+                </div>
                 <!-- Paso 1: Selección -->
                 <div class="card mb-4 shadow-sm">
                     <div class="card-header bg-white">
@@ -60,7 +66,7 @@
         </div>
     </div>
     <footer class="text-center text-muted py-2">
-        Renombrador Masivo de PDFs — CesarJam® - Versión 1.0.0
+        Renombrador Masivo de PDFs — CesarJam® - Versión 1.0.1
         <div class="form-check form-switch d-inline-block ms-3">
             <button id="toggleDarkMode" class="btn btn-sm btn-outline-secondary ms-2">🌙 Modo oscuro</button>
         </div>
@@ -76,14 +82,16 @@
 
     <!-- Toasts -->
     <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080;">
-    <div id="successToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="polite" aria-atomic="true" data-bs-delay="2000">
-        <div class="d-flex">
-        <div id="successToastBody" class="toast-body">
-            ✅ Operación exitosa.
+        <div id="successToast" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="polite"
+            aria-atomic="true" data-bs-delay="2000">
+            <div class="d-flex">
+                <div id="successToastBody" class="toast-body">
+                    ✅ Operación exitosa.
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"
+                    aria-label="Cerrar"></button>
+            </div>
         </div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button>
-        </div>
-    </div>
     </div>
 </body>
 
