@@ -63,8 +63,15 @@ const onFileChange = async (e) => {
   e.target.value = '' // Reset input
 
   // Calcular páginas asíncronamente
-  for (const item of newFiles) {
-    item.pages = await getPdfPageCount(item.raw)
+  for (const rawItem of newFiles) {
+    // Obtenemos el resultado (ya sea el número o 'Error')
+    const pageCount = await getPdfPageCount(rawItem.raw)
+    
+    // 💡 CLAVE: Buscar el objeto REACTIVO en filesData.value usando el ID
+    const reactiveItem = filesData.value.find(f => f.id === rawItem.id)
+    if (reactiveItem) {
+      reactiveItem.pages = pageCount // Ahora Vue sí detectará este cambio
+    }
   }
 }
 
