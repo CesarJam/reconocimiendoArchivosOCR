@@ -104,7 +104,7 @@ const saveFiles = async () => {
   <div class="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-300 pb-8">
     <AppHeader :is-dark-mode="isDarkMode" @toggle-dark="toggleDark" />
 
-    <main class="container mx-auto p-6">
+    <main class="w-full px-2">
       
       <div class="flex border-b border-slate-200 dark:border-slate-700 mb-6">
         <button 

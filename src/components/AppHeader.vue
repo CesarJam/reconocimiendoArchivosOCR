@@ -9,7 +9,7 @@ defineEmits(['toggle-dark'])
 
 <template>
   <header class="bg-white dark:bg-slate-800 border-b dark:border-slate-700 p-4 shadow-sm">
-    <div class="container mx-auto flex justify-between items-center">
+    <div class="container w-full px-2 flex justify-between items-center">
       <div class="flex items-center gap-2">
         <DocumentTextIcon class="w-8 h-8 text-blue-600" />
         <h1 class="text-xl font-bold dark:text-white text-slate-800">
