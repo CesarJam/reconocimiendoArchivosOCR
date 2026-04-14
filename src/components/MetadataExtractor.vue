@@ -11,7 +11,7 @@ const filesData = ref([])
 const storageRoute = ref('')
 const selectedTrimester = ref(0)
 const isCopying = ref(false)
-const tableRef = ref(null) // Referencia a la tabla para copiarla
+const tableBodyRef = ref(null) //referencia al contenido de la tabla
 
 // Configuración de Fechas
 const currentYear = new Date().getFullYear()
@@ -77,11 +77,12 @@ const onFileChange = async (e) => {
 
 // Lógica para copiar la tabla a Excel (Mantiene el formato HTML que le gusta a Excel)
 const copyTableToExcel = () => {
-  if (!tableRef.value || filesData.value.length === 0) return
+  // Verificamos que exista la referencia al cuerpo de la tabla
+  if (!tableBodyRef.value || filesData.value.length === 0) return
 
   try {
     const range = document.createRange()
-    range.selectNode(tableRef.value)
+    range.selectNode(tableBodyRef.value)
     window.getSelection().removeAllRanges()
     window.getSelection().addRange(range)
     document.execCommand('copy')
@@ -163,7 +164,7 @@ const copyTableToExcel = () => {
               <th class="p-3 font-semibold">Almacenamiento</th>
             </tr>
           </thead>
-          <tbody class="divide-y dark:divide-slate-700/50 text-sm dark:text-slate-300">
+          <tbody ref="tableBodyRef" class="divide-y dark:divide-slate-700/50 text-sm dark:text-slate-300">
             <tr v-for="file in filesData" :key="file.id" class="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
               <td class="p-3 font-medium text-slate-800 dark:text-slate-200">{{ file.name }}</td>
               <td class="p-3 text-right" :class="{'text-slate-400 italic': file.pages === 'Calculando...', 'font-bold': typeof file.pages === 'number'}">{{ file.pages }}</td>
