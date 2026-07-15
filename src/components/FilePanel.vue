@@ -1,32 +1,21 @@
-<script setup>
-import { 
-  CloudArrowUpIcon, 
-  CheckCircleIcon, 
-  ArrowPathIcon, 
-  FolderArrowDownIcon 
-} from '@heroicons/vue/24/outline'
-import { FileText, Trash2, Eye } from 'lucide-vue-next'
-
-const props = defineProps({
-  files: Array,
-  isProcessing: Boolean
-})
-
-const emit = defineEmits(['files-selected', 'remove-file', 'preview-file', 'start-rename', 'save-files'])
-
-const onFileChange = (e) => {
-  emit('files-selected', Array.from(e.target.files))
-  e.target.value = '' 
-}
-</script>
-
 <template>
   <div class="space-y-6">
-    <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 text-center hover:border-blue-500 transition-all group">
+    <!-- Contenedor principal con los eventos dragover, dragleave y drop integrados -->
+    <div 
+      @dragover.prevent="isDragging = true"
+      @dragleave.prevent="isDragging = false"
+      @drop.prevent="handleDrop"
+      :class="[
+        'p-8 rounded-2xl border-2 border-dashed text-center transition-all group',
+        isDragging ? 'border-blue-500 bg-blue-50 dark:bg-slate-700/50' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 hover:border-blue-500'
+      ]"
+    >
       <input type="file" multiple accept="application/pdf" @change="onFileChange" class="hidden" id="fileInput" />
-      <label for="fileInput" class="cursor-pointer flex flex-col items-center">
+      <label for="fileInput" class="cursor-pointer flex flex-col items-center w-full h-full">
         <CloudArrowUpIcon class="w-16 h-16 text-slate-400 group-hover:text-blue-500 transition-colors" />
-        <p class="mt-4 text-slate-600 dark:text-slate-300 font-medium text-lg">Suelta tus archivos PDF aquí</p>
+        <p class="mt-4 text-slate-600 dark:text-slate-300 font-medium text-lg">
+          {{ isDragging ? 'Suelta los archivos ahora' : 'Suelta tus archivos PDF aquí' }}
+        </p>
         <p class="text-sm text-slate-400">o haz clic para explorar tu equipo</p>
       </label>
     </div>
@@ -76,3 +65,37 @@ const onFileChange = (e) => {
     </div>
   </div>
 </template>
+<script setup>
+import { ref } from 'vue'
+import { 
+  CloudArrowUpIcon, 
+  CheckCircleIcon, 
+  ArrowPathIcon, 
+  FolderArrowDownIcon 
+} from '@heroicons/vue/24/outline'
+import { FileText, Trash2, Eye } from 'lucide-vue-next'
+
+const props = defineProps({
+  files: Array,
+  isProcessing: Boolean
+})
+
+const emit = defineEmits(['files-selected', 'remove-file', 'preview-file', 'start-rename', 'save-files'])
+
+// Variable reactiva para controlar los estilos cuando se arrastra un archivo
+const isDragging = ref(false)
+
+const onFileChange = (e) => {
+  emit('files-selected', Array.from(e.target.files))
+  e.target.value = '' 
+}
+
+// Función que maneja el evento de soltar los archivos
+const handleDrop = (e) => {
+  isDragging.value = false
+  const droppedFiles = Array.from(e.dataTransfer.files)
+  if (droppedFiles.length) {
+    emit('files-selected', droppedFiles)
+  }
+}
+</script>

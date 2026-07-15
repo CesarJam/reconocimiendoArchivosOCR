@@ -1,102 +1,3 @@
-<script setup>
-import { ref, computed, onMounted } from 'vue'
-import { CloudArrowUpIcon, DocumentDuplicateIcon } from '@heroicons/vue/24/outline'
-import * as pdfjsLib from 'pdfjs-dist'
-
-// Mantenemos la misma configuración estable del worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.mjs`
-
-// Estados
-const filesData = ref([])
-const storageRoute = ref('')
-const selectedTrimester = ref(0)
-const isCopying = ref(false)
-const tableBodyRef = ref(null) //referencia al contenido de la tabla
-
-// Configuración de Fechas
-const currentYear = new Date().getFullYear()
-const trimesters = [
-  { value: 0, label: 'Enero - Marzo', start: `${currentYear}-01-01`, end: `${currentYear}-03-31` },
-  { value: 1, label: 'Abril - Junio', start: `${currentYear}-04-01`, end: `${currentYear}-06-30` },
-  { value: 2, label: 'Julio - Septiembre', start: `${currentYear}-07-01`, end: `${currentYear}-09-30` },
-  { value: 3, label: 'Octubre - Diciembre', start: `${currentYear}-10-01`, end: `${currentYear}-12-31` }
-]
-
-const currentDates = computed(() => {
-  return trimesters.find(t => t.value === selectedTrimester.value)
-})
-
-// Asignar el trimestre actual por defecto al cargar
-onMounted(() => {
-  const currentMonth = new Date().getMonth()
-  selectedTrimester.value = Math.floor(currentMonth / 3)
-})
-
-// Procesar PDFs para contar páginas
-const getPdfPageCount = async (file) => {
-  const url = URL.createObjectURL(file)
-  try {
-    const loadingTask = pdfjsLib.getDocument({ url })
-    const pdf = await loadingTask.promise
-    const pages = pdf.numPages
-    URL.revokeObjectURL(url)
-    return pages
-  } catch (err) {
-    console.error("Error al leer PDF:", file.name, err)
-    URL.revokeObjectURL(url)
-    return 'Error'
-  }
-}
-
-const onFileChange = async (e) => {
-  const selectedFiles = Array.from(e.target.files)
-  
-  // Agregar archivos con estado inicial
-  const newFiles = selectedFiles.map(file => ({
-    id: crypto.randomUUID(),
-    name: file.name,
-    pages: 'Calculando...',
-    raw: file
-  }))
-  
-  filesData.value = [...filesData.value, ...newFiles]
-  e.target.value = '' // Reset input
-
-  // Calcular páginas asíncronamente
-  for (const rawItem of newFiles) {
-    // Obtenemos el resultado (ya sea el número o 'Error')
-    const pageCount = await getPdfPageCount(rawItem.raw)
-    
-    // 💡 CLAVE: Buscar el objeto REACTIVO en filesData.value usando el ID
-    const reactiveItem = filesData.value.find(f => f.id === rawItem.id)
-    if (reactiveItem) {
-      reactiveItem.pages = pageCount // Ahora Vue sí detectará este cambio
-    }
-  }
-}
-
-// Lógica para copiar la tabla a Excel (Mantiene el formato HTML que le gusta a Excel)
-const copyTableToExcel = () => {
-  // Verificamos que exista la referencia al cuerpo de la tabla
-  if (!tableBodyRef.value || filesData.value.length === 0) return
-
-  try {
-    const range = document.createRange()
-    range.selectNode(tableBodyRef.value)
-    window.getSelection().removeAllRanges()
-    window.getSelection().addRange(range)
-    document.execCommand('copy')
-    window.getSelection().removeAllRanges()
-
-    isCopying.value = true
-    setTimeout(() => { isCopying.value = false }, 2000)
-  } catch (err) {
-    console.error('Error al copiar la tabla: ', err)
-    alert("Hubo un error al intentar copiar la tabla.")
-  }
-}
-</script>
-
 <template>
   <div class="space-y-6">
     <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border dark:border-slate-700">
@@ -119,11 +20,22 @@ const copyTableToExcel = () => {
       </div>
     </div>
 
-    <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 text-center hover:border-blue-500 transition-all group">
+    <!-- NUEVO: Contenedor actualizado con eventos dragover, dragleave y drop -->
+    <div 
+      @dragover.prevent="isDragging = true"
+      @dragleave.prevent="isDragging = false"
+      @drop.prevent="handleDrop"
+      :class="[
+        'p-8 rounded-2xl border-2 border-dashed text-center transition-all group',
+        isDragging ? 'border-blue-500 bg-blue-50 dark:bg-slate-700/50' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 hover:border-blue-500'
+      ]"
+    >
       <input type="file" multiple accept="application/pdf" @change="onFileChange" class="hidden" id="metadataFileInput" />
-      <label for="metadataFileInput" class="cursor-pointer flex flex-col items-center">
+      <label for="metadataFileInput" class="cursor-pointer flex flex-col items-center w-full h-full">
         <CloudArrowUpIcon class="w-16 h-16 text-slate-400 group-hover:text-blue-500 transition-colors" />
-        <p class="mt-4 text-slate-600 dark:text-slate-300 font-medium text-lg">Suelta tus archivos PDF aquí</p>
+        <p class="mt-4 text-slate-600 dark:text-slate-300 font-medium text-lg">
+          {{ isDragging ? 'Suelta los archivos ahora' : 'Suelta tus archivos PDF aquí' }}
+        </p>
         <p class="text-sm text-slate-400">para extraer sus metadatos y contar sus páginas</p>
       </label>
     </div>
@@ -193,3 +105,116 @@ const copyTableToExcel = () => {
     </div>
   </div>
 </template>
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { CloudArrowUpIcon, DocumentDuplicateIcon } from '@heroicons/vue/24/outline'
+import * as pdfjsLib from 'pdfjs-dist'
+
+// Mantenemos la misma configuración estable del worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.mjs`
+
+// Estados
+const filesData = ref([])
+const storageRoute = ref('')
+const selectedTrimester = ref(0)
+const isCopying = ref(false)
+const tableBodyRef = ref(null)
+
+// NUEVO: Estado para el Drag and Drop
+const isDragging = ref(false)
+
+// Configuración de Fechas
+const currentYear = new Date().getFullYear()
+const trimesters = [
+  { value: 0, label: 'Enero - Marzo', start: `${currentYear}-01-01`, end: `${currentYear}-03-31` },
+  { value: 1, label: 'Abril - Junio', start: `${currentYear}-04-01`, end: `${currentYear}-06-30` },
+  { value: 2, label: 'Julio - Septiembre', start: `${currentYear}-07-01`, end: `${currentYear}-09-30` },
+  { value: 3, label: 'Octubre - Diciembre', start: `${currentYear}-10-01`, end: `${currentYear}-12-31` }
+]
+
+const currentDates = computed(() => {
+  return trimesters.find(t => t.value === selectedTrimester.value)
+})
+
+// Asignar el trimestre actual por defecto al cargar
+onMounted(() => {
+  const currentMonth = new Date().getMonth()
+  selectedTrimester.value = Math.floor(currentMonth / 3)
+})
+
+// Procesar PDFs para contar páginas
+const getPdfPageCount = async (file) => {
+  const url = URL.createObjectURL(file)
+  try {
+    const loadingTask = pdfjsLib.getDocument({ url })
+    const pdf = await loadingTask.promise
+    const pages = pdf.numPages
+    URL.revokeObjectURL(url)
+    return pages
+  } catch (err) {
+    console.error("Error al leer PDF:", file.name, err)
+    URL.revokeObjectURL(url)
+    return 'Error'
+  }
+}
+
+// NUEVO: Función centralizada para procesar archivos (usada por Drag & Drop y por Input)
+const processFiles = async (selectedFiles) => {
+  // Filtrar solo PDFs (opcional, pero recomendado para el drag and drop)
+  const pdfFiles = selectedFiles.filter(file => file.type === 'application/pdf')
+  
+  const newFiles = pdfFiles.map(file => ({
+    id: crypto.randomUUID(),
+    name: file.name,
+    pages: 'Calculando...',
+    raw: file
+  }))
+  
+  filesData.value = [...filesData.value, ...newFiles]
+
+  // Calcular páginas asíncronamente
+  for (const rawItem of newFiles) {
+    const pageCount = await getPdfPageCount(rawItem.raw)
+    const reactiveItem = filesData.value.find(f => f.id === rawItem.id)
+    if (reactiveItem) {
+      reactiveItem.pages = pageCount 
+    }
+  }
+}
+
+// Handler para el input tradicional
+const onFileChange = (e) => {
+  const selectedFiles = Array.from(e.target.files)
+  processFiles(selectedFiles)
+  e.target.value = '' // Reset input
+}
+
+// NUEVO: Handler para soltar archivos
+const handleDrop = (e) => {
+  isDragging.value = false
+  const droppedFiles = Array.from(e.dataTransfer.files)
+  if (droppedFiles.length) {
+    processFiles(droppedFiles)
+  }
+}
+
+// Lógica para copiar la tabla a Excel
+const copyTableToExcel = () => {
+  if (!tableBodyRef.value || filesData.value.length === 0) return
+
+  try {
+    const range = document.createRange()
+    range.selectNode(tableBodyRef.value)
+    window.getSelection().removeAllRanges()
+    window.getSelection().addRange(range)
+    document.execCommand('copy')
+    window.getSelection().removeAllRanges()
+
+    isCopying.value = true
+    setTimeout(() => { isCopying.value = false }, 2000)
+  } catch (err) {
+    console.error('Error al copiar la tabla: ', err)
+    alert("Hubo un error al intentar copiar la tabla.")
+  }
+}
+</script>
